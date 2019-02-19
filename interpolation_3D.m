@@ -1,4 +1,4 @@
-function [A,B,C,D,E,F,G,H] = interpolation_3D(x,y,z,intensity)
+function [A,B,C,D,E,F,G,H] = interpolation_3D(x,y,z)
 % For now, 2D and origin is top left back (E)
 A = [floor(x),floor(y),ceil(z)];
 B = [ceil(x),floor(y),ceil(z)];
@@ -12,6 +12,8 @@ H = [ceil(x),ceil(y),floor(z)];
 alpha = x - A(1);
 beta = y - B(2);
 gamma = z - E(3);
+
+intensity = 1;
 
 A(4) = intensity * (1-alpha) * (1-beta) * (gamma);
 B(4) = intensity * (alpha) * (1-beta) * (gamma);
