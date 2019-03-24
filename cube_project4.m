@@ -42,8 +42,24 @@ for xind=2:new_sz(1)
 end
 
 %% determine cube size
-wind=zeros(3,2);
-med=round(new_sz)/2;
+figure(1)
+hold on
+[X,Y,Z]=ind2sub(size(new_cube),find(new_cube));
+plot3(X,Y,Z, '.');
+xlim([0,150])
+ylim([0,150])
+zlim([0,150])
+daspect([1,1,1])
+
+cube_ind=[X Y Z];
+[k,V]=boundary(cube_ind);
+trisurf(k,X,Y,Z,'Facecolor','red','FaceAlpha',0.1);
+xV=info.widthspan/new_sz(1);
+yV=info.heightspan/new_sz(2);
+zV=info.depthspan/new_sz(3);
+V=V.*xV.*yV.*zV;
+fprintf('The volume of the cube is %0.0f cubic units.\n',V);
+
 
 %% functions
 function I=ind_mat(coords)
