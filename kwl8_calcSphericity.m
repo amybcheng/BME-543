@@ -11,7 +11,7 @@ b0 = strcmp(geometry, 'sphere');
 b1 = strcmp(geometry, 'cube');
 
 if b0 == 1
-    [x,y,z]= sphere(50);
+    [x,y,z]= sphere(100);
 elseif b1 == 1
     b2 = isempty(new_cube);
     if b2 == 0
@@ -55,7 +55,7 @@ vol = volume(shp);
 
 sphericity = pi^(1/3) * (6*vol)^(2/3) / sa;
 
-fprintf('SA: %0.3f \n', sa);
-fprintf('Volume: %0.3f \n', vol);
-fprintf('Sphericity: %0.3f \n', sphericity);
+fprintf('SA: %0.5f \n', sa);
+fprintf('Volume: %0.5f \n', vol);
+fprintf('Sphericity: %0.5f \n', sphericity);
 fprintf('\n')
