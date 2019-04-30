@@ -1,4 +1,4 @@
-function [sphericity] = readPatient(path,file,plot_flag,video_flag)
+function [sphericity vol_cm sa_cm] = readPatient(path_vnt,file_vnt,path_dcm,file_dcm,plot_flag,video_flag)
 % Function to take a .vnt file from 4DVis, generate plots (if indicated) of
 % point cloud and mesh representations, then output sphericity as a nfx1
 % vector
@@ -12,16 +12,20 @@ if video_flag==1 && plot_flag==0
     plot_flag=1; %set it anyway
 end
 
+% Scale, from the dicom
+metadata=readDicom3D(strcat(path_dcm,file_dcm),0);
+Scale1D = max(metadata.widthspan,max(metadata.heightspan,metadata.depthspan));
+
 % edit file extension
-dirname = strcat(path,'output');
+dirname = strcat(path_vnt,'output');
 if ~exist(dirname, 'dir')
        mkdir(dirname);
 end
-filename = [path, file];
+filename = [path_vnt, file_vnt];
 %file = file(1:end-4);
 
 % first frame
-[points, type, base, apex, lat, Z, T] = load_vent_mesh(filename);
+[points, type, base, apex, lat, Z, T] = load_vent_mesh(strcat(path_vnt,file_vnt));
 nf = size(points,1); % number of frames
 sphericity = zeros(nf,1);
 R = squeeze(points(1,:,:)); % first frame only
@@ -30,7 +34,7 @@ PC = [x(:),y(:),z(:)];
 PC = unique(PC,'rows');
 shp = alphaShape(PC(:,1),PC(:,2),PC(:,3),Inf);
 if (plot_flag==1)
-    imagename = strcat(path,'output/',file,'_image_frame_1');
+    imagename = strcat(path_vnt,'output/',file_vnt,'_image_frame_1');
     figure;
     subplot(1,2,1)
     plot3(PC(:,1),PC(:,2),PC(:,3),'k.');
@@ -43,7 +47,7 @@ if (plot_flag==1)
     title('Mesh representation')
     saveas(gcf,imagename,'png')
     if (video_flag==1)
-        videoname = strcat(path,'output/',file,'_video_frame_1');
+        videoname = strcat(path_vnt,'output/',file_vnt,'_video_frame_1');
         OptionZ.FrameRate=15;OptionZ.Duration=5.5;OptionZ.Periodic=true;
         CaptureFigVid([-20,10;-110,10;-190,80;-290,10;-380,10], videoname ,OptionZ)
     end
@@ -51,11 +55,17 @@ end
 sa = surfaceArea(shp);
 vol = volume(shp);
 sphericity(1) = pi^(1/3) * (6*vol)^(2/3) / sa;
-fprintf('Filename: %s, Frame %d: Sphericity: %0.3f \n', file, 1, sphericity(1));
+fprintf('Filename: %s, Frame: %d, Sphericity: %0.3f \n', file_vnt, 1, sphericity(1));
 
+% Volume calculation
+zlen = sum((apex(1,:)-base(1,:)).^2).^0.5;
+scale = pi * zlen / 128 / 256  * Scale1D * Scale1D * Scale1D; % su3 to cm3
+vol_cm(1) = vol * Scale1D^3;
+sa_cm(1) = sa * Scale1D^2;
+%fprintf('Volume (cm^3): %0.3f, Surface area (cm^2): %0.3f\n', vol_cm, sa_cm);
 
 for t=2:nf
-    [points, type, base, apex, lat, Z, T] = load_vent_mesh(file);
+    [points, type, base, apex, lat, Z, T] = load_vent_mesh(file_vnt);
     R = squeeze(points(t,:,:)); % which frame
     [x,y,z] = pol2cart(T, R, Z);
     PC = [x(:),y(:),z(:)];
@@ -64,10 +74,16 @@ for t=2:nf
     sa = surfaceArea(shp);
     vol = volume(shp);
     sphericity(t) = pi^(1/3) * (6*vol)^(2/3) / sa;
-    fprintf('Filename: %s, Frame %d: Sphericity: %0.3f \n', file, t, sphericity(t));
+    fprintf('Filename: %s, Frame %d: Sphericity: %0.3f \n', file_vnt, t, sphericity(t));
+    
+    % Volume calculation
+    zlen = sum((apex(t,:)-base(t,:)).^2).^0.5;
+    vol_cm(t) = vol * Scale1D^3;
+    sa_cm(t) = sa * Scale1D^2;
+    %fprintf('Volume (cm^3): %0.3f, Surface area (cm^2): %0.3f\n', vol_cm, sa_cm);
     
     if (plot_flag==1)
-        imagename = strcat(path,'output/',file,'_image_frame_',num2str(t));
+        imagename = strcat(path_vnt,'output/',file_vnt,'_image_frame_',num2str(t));
         figure;clf
         subplot(1,2,1)
         plot3(x,y,z,'k.');
@@ -80,12 +96,38 @@ for t=2:nf
         title('Mesh representation')
         saveas(gcf,imagename,'png')
         if (video_flag==1)
-            videoname = strcat(path,'output/',file,'_video_frame_',num2str(t));
+            videoname = strcat(path_vnt,'output/',file_vnt,'_video_frame_',num2str(t));
             OptionZ.FrameRate=15;OptionZ.Duration=5.5;OptionZ.Periodic=true;
             CaptureFigVid([-20,10;-110,10;-190,80;-290,10;-380,10], videoname ,OptionZ)
         end
+        
     end
+   
 end
+
+totalvals = [sphericity vol_cm.' sa_cm.'];
+csv_name = strcat(path_vnt,'output/',file_vnt,'_output_values.csv');
+csvwrite(csv_name,totalvals);
+
+edv = sphericity(find(vol_cm==max(vol_cm)));
+fprintf('End diastolic volume sphericity: %0.3f\n', edv);
+
+% figure;clf
+% subplot(3,1,1)
+% plot(1:nf,vol_cm,'LineWidth',2)
+% yyaxis left
+% ylabel('Volume (cm^3)')
+% hold on
+% plot(1:nf,sa_cm,'LineWidth',2)
+% yyaxis right
+% ylabel('Surface area (cm^2)')
+% title('Volume, surface area')
+% xlabel('Frame')
+% 
+% subplot(3,1,2)
+% plot(1:nf,sphericity,'LineWidth',2)
+% title('Sphericity')
+% xlabel('Frame')
 
     function CaptureFigVid(ViewZ, FileName,OptionZ)
         % CaptureFigVid(ViewZ, FileName,OptionZ)
